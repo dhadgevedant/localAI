@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ollama Chat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.2/marked.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg-primary: #ffffff; --bg-secondary: #f8f8f8; --bg-tertiary: #f5f5f5;
+            --text-primary: #2d2d2d; --text-secondary: #666666; --text-tertiary: #999999;
+            --border-light: #e5e5e5; --border-medium: #d1d1d1; --accent: #57d9a1;
+            --accent-hover: #45c48f; --accent-light: #faf7f5; --shadow: rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1a1a1a; --bg-secondary: #2a2a2a; --bg-tertiary: #333333;
+            --text-primary: #f0f0f0; --text-secondary: #cccccc; --text-tertiary: #999999;
+            --border-light: #404040; --border-medium: #555555; --accent-light: #1b292a;
+            --shadow: rgba(0, 0, 0, 0.3);
+        }
+
+        body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.5; transition: all 0.2s ease; }
+
+        /* Login Screen */
+        .login-container { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+        .login-box { background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: 16px; padding: 40px; width: 100%; max-width: 400px; box-shadow: 0 4px 20px var(--shadow); }
+        .login-title { font-size: 24px; font-weight: 600; text-align: center; margin-bottom: 8px; color: var(--text-primary); }
+        .login-subtitle { text-align: center; color: var(--text-secondary); margin-bottom: 32px; }
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary); }
+        .form-input { width: 100%; padding: 12px 16px; border: 1px solid var(--border-medium); border-radius: 8px; background: var(--bg-primary); color: var(--text-primary); font-size: 15px; transition: border-color 0.2s; }
+        .form-input:focus { outline: none; border-color: var(--accent); }
+        .form-btn { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
+        .form-btn:hover { background: var(--accent-hover); }
+        .form-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .toggle-form { text-align: center; margin-top: 20px; color: var(--text-secondary); }
+        .toggle-link { color: var(--accent); cursor: pointer; text-decoration: none; }
+        .error-message { color: #e74c3c; font-size: 14px; margin-top: 8px; }
+
+        /* Chat Interface */
+        .chat-app { display: none; }
+        .header { position: fixed; top: 0; left: 0; right: 0; background: var(--bg-primary); border-bottom: 1px solid var(--border-light); z-index: 100; backdrop-filter: blur(10px); }
+        .header-content { max-width: 768px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
+        .logo { font-size: 18px; font-weight: 600; color: var(--text-primary); }
+        .header-actions { display: flex; gap: 8px; align-items: center; }
+        .header-btn { background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 14px; color: var(--text-secondary); transition: all 0.2s ease; }
+        .header-btn:hover { background: var(--bg-tertiary); }
+        .header-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+        .main-container { max-width: 768px; margin: 0 auto; padding-top: 80px; min-height: 100vh; display: flex; flex-direction: column; }
+        .chat-container { flex: 1; padding: 0 20px 20px; }
+        
+        .sidebar { position: fixed; top: 80px; right: -320px; width: 300px; height: calc(100vh - 80px); background: var(--bg-secondary); border-left: 1px solid var(--border-light); z-index: 90; transition: right 0.3s ease; overflow-y: auto; }
+        .sidebar.visible { right: 0; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center; }
+        .sidebar-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+        .new-chat-btn { background: var(--accent); color: white; border: none; border-radius: 8px; padding: 8px 16px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s ease; }
+        .new-chat-btn:hover { background: var(--accent-hover); }
+
+        .chat-history { padding: 10px; }
+        .chat-item { padding: 12px 16px; margin-bottom: 4px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent; }
+        .chat-item:hover { background: var(--bg-tertiary); }
+        .chat-item.active { background: var(--accent-light); border-color: var(--border-medium); }
+        .chat-item-title { font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .chat-item-preview { font-size: 12px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .chat-item-date { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; }
+
+        .conversation { margin-bottom: 100px; }
+        .message { margin-bottom: 32px; }
+        .message-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .avatar { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+        .user-avatar { background: var(--accent); color: white; }
+        .ai-avatar { background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border-light); }
+        .message-sender { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        .message-content { padding-left: 32px; font-size: 15px; line-height: 1.6; color: var(--text-primary); }
+
+        .ai-message h1, .ai-message h2, .ai-message h3 { margin: 20px 0 12px 0; font-weight: 600; color: var(--text-primary); }
+        .ai-message h1 { font-size: 24px; } .ai-message h2 { font-size: 20px; } .ai-message h3 { font-size: 18px; }
+        .ai-message p { margin: 12px 0; }
+        .ai-message ul, .ai-message ol { margin: 12px 0; padding-left: 20px; }
+        .ai-message li { margin: 6px 0; }
+        .ai-message code { background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px; font-family: 'SF Mono', Monaco, monospace; font-size: 13px; color: var(--accent); }
+        .ai-message pre { background: var(--bg-tertiary); border: 1px solid var(--border-light); border-radius: 8px; padding: 16px; margin: 16px 0; overflow-x: auto; font-family: 'SF Mono', Monaco, monospace; font-size: 13px; }
+        .ai-message pre code { background: none; padding: 0; color: var(--text-primary); }
+
+        .input-container { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg-primary); padding: 20px; backdrop-filter: blur(10px); }
+        .input-wrapper { max-width: 768px; margin: 0 auto; position: relative; }
+        .input-box { background: var(--bg-primary); border: 2px solid var(--border-light); border-radius: 24px; padding: 16px 120px 16px 20px; font-size: 15px; font-family: inherit; color: var(--text-primary); resize: none; outline: none; width: 100%; min-height: 56px; max-height: 200px; transition: all 0.2s ease; box-shadow: 0 2px 12px var(--shadow); }
+        .input-box:focus { border-color: var(--accent); }
+        .input-box::placeholder { color: var(--text-tertiary); }
+        .input-actions { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); display: flex; gap: 6px; align-items: center; }
+        .action-btn { background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: 12px; padding: 8px 12px; cursor: pointer; height: 32px; font-size: 13px; font-weight: 500; color: var(--text-secondary); transition: all 0.2s ease; }
+        .action-btn:hover:not(:disabled) { background: var(--bg-tertiary); color: var(--text-primary); }
+        .action-btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+        .action-btn.primary:hover:not(:disabled) { background: var(--accent-hover); }
+        .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .status-indicator { position: fixed; bottom: 10vh; left: 50%; transform: translate(-50%, -50%); background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: 20px; padding: 8px 16px; font-size: 13px; color: var(--text-secondary); z-index: 200; opacity: 0; transition: opacity 0.2s ease; pointer-events: none; }
+        .status-indicator.visible { opacity: 1; }
+
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+        .empty-state h2 { font-size: 24px; font-weight: 600; margin-bottom: 8px; color: var(--text-primary); }
+        .empty-state p { font-size: 16px; line-height: 1.5; }
+
+        .overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.3); z-index: 80; opacity: 0; visibility: hidden; transition: all 0.3s ease; }
+        .overlay.visible { opacity: 1; visibility: visible; }
+
+        @media (max-width: 768px) {
+            .header-content, .chat-container, .input-container { padding: 12px 16px; }
+            .input-box { padding: 14px 100px 14px 16px; font-size: 16px; }
+            .input-actions { right: 16px; }
+            .sidebar { width: 100%; right: -100%; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div class="login-container" id="loginContainer">
+        <div class="login-box">
+            <h1 class="login-title">Home AI</h1>
+            <p class="login-subtitle">Sign in to continue</p>
+            
+            <!-- Login Form -->
+            <form id="loginForm">
+                <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <input type="text" class="form-input" id="loginUsername" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-input" id="loginPassword" required>
+                </div>
+                <button type="submit" class="form-btn">Sign In</button>
+                <div id="loginError" class="error-message" style="display:none;"></div>
+            </form>
+            
+            <!-- Register Form -->
+            <form id="registerForm" style="display:none;">
+                <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <input type="text" class="form-input" id="registerUsername" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-input" id="registerPassword" required>
+                </div>
+                <button type="submit" class="form-btn">Sign Up</button>
+                <div id="registerError" class="error-message" style="display:none;"></div>
+            </form>
+            
+            <div class="toggle-form">
+                <span id="toggleText">Don't have an account?</span>
+                <a href="#" class="toggle-link" id="toggleLink">Sign up</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat App -->
+    <div class="chat-app" id="chatApp">
+        <div class="header">
+            <div class="header-content">
+                <div class="logo">Ollama AI</div>
+                <div class="header-actions">
+                    <button class="header-btn" id="historyBtn" onclick="toggleHistory()">History</button>
+                    <button class="header-btn" onclick="toggleTheme()">Theme</button>
+                    <button class="header-btn" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">Chat History</div>
+                <button class="new-chat-btn" onclick="startNewChat()">New Chat</button>
+            </div>
+            <div class="chat-history" id="chatHistory"></div>
+        </div>
+
+        <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+        <div class="main-container">
+            <div class="chat-container">
+                <div class="conversation" id="conversation">
+                    <div class="empty-state">
+                        <h2>Home AI</h2>
+                        <p>Start a conversation with your AI assistant.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <div class="input-wrapper">
+                <textarea id="input" class="input-box" placeholder="Ask anything..." rows="1"></textarea>
+                <div class="input-actions">
+                    <button class="action-btn primary" id="sendBtn" onclick="send()">></button>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-indicator" id="statusIndicator">Thinking...</div>
+    </div>
+
+    <script>
+        let processing = false, currentUser = null, currentChatId = null;
+        const API_BASE = `http://${window.location.hostname}:3000/api`;
+        const OLLAMA_BASE = `http://${window.location.hostname}:11434`; // Use server IP instead of localhost
+
+        // Theme
+        document.body.setAttribute('data-theme', window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        function toggleTheme() { 
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+            document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+        }
+
+        // Auth
+        document.getElementById('toggleLink').onclick = (e) => {
+            e.preventDefault();
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            const toggleText = document.getElementById('toggleText');
+            const toggleLink = document.getElementById('toggleLink');
+            
+            if (loginForm.style.display === 'none') {
+                loginForm.style.display = 'block';
+                registerForm.style.display = 'none';
+                toggleText.textContent = "Don't have an account?";
+                toggleLink.textContent = 'Sign up';
+            } else {
+                loginForm.style.display = 'none';
+                registerForm.style.display = 'block';
+                toggleText.textContent = 'Already have an account?';
+                toggleLink.textContent = 'Sign in';
+            }
+        };
+
+        document.getElementById('loginForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            try {
+                const res = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    currentUser = data.user;
+                    showChatApp();
+                    loadChatHistory();
+                } else {
+                    document.getElementById('loginError').textContent = data.error;
+                    document.getElementById('loginError').style.display = 'block';
+                }
+            } catch (error) {
+                document.getElementById('loginError').textContent = 'Connection error';
+                document.getElementById('loginError').style.display = 'block';
+            }
+        };
+
+        document.getElementById('registerForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('registerUsername').value;
+            const password = document.getElementById('registerPassword').value;
+            
+            try {
+                const res = await fetch(`${API_BASE}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    currentUser = data.user;
+                    showChatApp();
+                    loadChatHistory();
+                } else {
+                    document.getElementById('registerError').textContent = data.error;
+                    document.getElementById('registerError').style.display = 'block';
+                }
+            } catch (error) {
+                document.getElementById('registerError').textContent = 'Connection error';
+                document.getElementById('registerError').style.display = 'block';
+            }
+        };
+
+        function showChatApp() {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('chatApp').style.display = 'block';
+            document.getElementById('input').focus();
+        }
+
+        function logout() {
+            currentUser = null; currentChatId = null;
+            document.getElementById('loginContainer').style.display = 'flex';
+            document.getElementById('chatApp').style.display = 'none';
+            document.getElementById('conversation').innerHTML = '<div class="empty-state"><h2>Home AI</h2><p>Start a conversation with your AI assistant.</p></div>';
+        }
+
+        // Chat functionality
+        async function startNewChat() {
+            try {
+                const res = await fetch(`${API_BASE}/chats`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: currentUser._id, title: 'New Chat' })
+                });
+                const data = await res.json();
+                currentChatId = data.chat._id;
+                clearConversation();
+                loadChatHistory();
+                closeSidebar();
+            } catch (error) {
+                console.error('Error creating new chat:', error);
+            }
+        }
+
+        async function loadChatHistory() {
+            try {
+                const res = await fetch(`${API_BASE}/chats/${currentUser._id}`);
+                const data = await res.json();
+                const historyContainer = document.getElementById('chatHistory');
+                
+                historyContainer.innerHTML = data.chats.map(chat => `
+                    <div class="chat-item ${chat._id === currentChatId ? 'active' : ''}" onclick="switchToChat('${chat._id}')">
+                        <div class="chat-item-title">${chat.title}</div>
+                        <div class="chat-item-preview">${chat.messages.length > 0 ? chat.messages[chat.messages.length - 1].content.substring(0, 60) + '...' : 'No messages'}</div>
+                        <div class="chat-item-date">${new Date(chat.updatedAt).toLocaleDateString()}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading chat history:', error);
+            }
+        }
+
+        async function switchToChat(chatId) {
+            try {
+                currentChatId = chatId;
+                const res = await fetch(`${API_BASE}/chats/chat/${chatId}`);
+                const data = await res.json();
+                
+                const conversation = document.getElementById('conversation');
+                conversation.innerHTML = '';
+                
+                if (data.chat.messages.length === 0) {
+                    conversation.innerHTML = '<div class="empty-state"><h2>Home AI</h2><p>Start a conversation with your AI assistant.</p></div>';
+                } else {
+                    // Load messages in order and render properly
+                    data.chat.messages.forEach(msg => {
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = 'message';
+                        messageDiv.innerHTML = `
+                            <div class="message-header">
+                                <div class="avatar ${msg.isUser ? 'user-avatar' : 'ai-avatar'}">${msg.isUser ? 'U' : 'AI'}</div>
+                                <div class="message-sender">${msg.isUser ? 'You' : 'Assistant'}</div>
+                            </div>
+                            <div class="message-content ${msg.isUser ? '' : 'ai-message'}">${msg.isUser ? msg.content : marked.parse(msg.content)}</div>
+                        `;
+                        conversation.appendChild(messageDiv);
+                    });
+                }
+                
+                conversation.scrollTop = conversation.scrollHeight;
+                loadChatHistory();
+                closeSidebar();
+            } catch (error) {
+                console.error('Error switching to chat:', error);
+            }
+        }
+
+        function clearConversation() {
+            document.getElementById('conversation').innerHTML = '<div class="empty-state"><h2>Home AI</h2><p>Start a conversation with your AI assistant.</p></div>';
+        }
+
+        function addMessageToDisplay(content, isUser = false, save = true) {
+            const conversation = document.getElementById('conversation');
+            if (conversation.querySelector('.empty-state')) conversation.innerHTML = '';
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.innerHTML = `
+                <div class="message-header">
+                    <div class="avatar ${isUser ? 'user-avatar' : 'ai-avatar'}">${isUser ? 'U' : 'AI'}</div>
+                    <div class="message-sender">${isUser ? 'You' : 'Assistant'}</div>
+                </div>
+                <div class="message-content ${isUser ? '' : 'ai-message'}">${isUser ? content : ''}</div>
+            `;
+            
+            conversation.appendChild(messageDiv);
+            conversation.scrollTop = conversation.scrollHeight;
+            
+            return isUser ? null : messageDiv.querySelector('.message-content');
+        }
+
+        async function send() {
+            if (processing || !currentUser) return;
+            
+            const inputEl = document.getElementById('input');
+            const userMessage = inputEl.value.trim();
+            if (!userMessage) return;
+
+            if (!currentChatId) await startNewChat();
+
+            addMessageToDisplay(userMessage, true);
+            inputEl.value = '';
+            inputEl.style.height = 'auto';
+
+            processing = true;
+            document.getElementById('sendBtn').disabled = true;
+            document.getElementById('sendBtn').textContent = '...';
+            document.getElementById('statusIndicator').classList.add('visible');
+
+            const aiMessageEl = addMessageToDisplay('', false, false);
+            let fullText = '';
+
+            try {
+                // Save user message first
+                console.log('Saving user message...');
+                await fetch(`${API_BASE}/chats/${currentChatId}/messages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: userMessage, isUser: true })
+                });
+
+                // Get AI response using the server IP
+                console.log('Requesting AI response from:', `${OLLAMA_BASE}/api/generate`);
+                const res = await fetch(`${OLLAMA_BASE}/api/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        model: 'llama3.1', 
+                        prompt: userMessage, 
+                        stream: true 
+                    })
+                });
+
+                if (!res.ok) {
+                    throw new Error(`Ollama server responded with ${res.status}: ${res.statusText}`);
+                }
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const parsed = JSON.parse(line);
+                            if (parsed.response) {
+                                fullText += parsed.response;
+                                aiMessageEl.innerHTML = marked.parse(fullText);
+                                aiMessageEl.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                            }
+                        } catch (e) {
+                            console.error('Error parsing JSON:', e);
+                        }
+                    }
+                }
+
+                // Save AI response to database - wait for completion
+                if (fullText.trim()) {
+                    console.log('Saving AI response...');
+                    const saveRes = await fetch(`${API_BASE}/chats/${currentChatId}/messages`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content: fullText, isUser: false })
+                    });
+                    
+                    if (!saveRes.ok) {
+                        console.error('Failed to save AI response:', await saveRes.text());
+                    } else {
+                        console.log('AI response saved successfully');
+                        // Update chat history after saving
+                        setTimeout(() => loadChatHistory(), 500);
+                    }
+                } else {
+                    console.warn('No AI response to save');
+                    aiMessageEl.innerHTML = '<p style="color: var(--accent);">No response received from AI.</p>';
+                }
+
+            } catch (error) {
+                console.error('Error in send function:', error);
+                let errorMessage = 'Connection error. ';
+                
+                if (error.message.includes('Failed to fetch')) {
+                    errorMessage += `Cannot connect to Ollama server at ${OLLAMA_BASE}. Make sure Ollama is running and accessible.`;
+                } else {
+                    errorMessage += error.message;
+                }
+                
+                aiMessageEl.innerHTML = `<p style="color: #e74c3c;">${errorMessage}</p>`;
+            } finally {
+                processing = false;
+                document.getElementById('sendBtn').disabled = false;
+                document.getElementById('sendBtn').textContent = '>';
+                document.getElementById('statusIndicator').classList.remove('visible');
+                inputEl.focus();
+            }
+        }
+
+        // UI handlers
+        function toggleHistory() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('overlay');
+            const btn = document.getElementById('historyBtn');
+            
+            sidebar.classList.toggle('visible');
+            overlay.classList.toggle('visible');
+            btn.classList.toggle('active');
+        }
+
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.remove('visible');
+            document.getElementById('overlay').classList.remove('visible');
+            document.getElementById('historyBtn').classList.remove('active');
+        }
+
+        // Auto-resize textarea
+        document.getElementById('input').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+        });
+
+        // Enter to send
+        document.getElementById('input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                send();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Building a Local AI Chat Application</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #ffffff;
+            --text-primary: #2e2e2e;
+            --text-secondary: #6b6b6b;
+            --text-tertiary: #9b9b9b;
+            --border: #e5e5e5;
+            --code-bg: #f7f7f7;
+            --accent: #2e2e2e;
+            --tab-active: #03998a;
+            --tab-bg: #f8f9fa;
+        }
+
+        [data-theme="dark"] {
+            --bg: #1a1a1a;
+            --text-primary: #e1e1e1;
+            --text-secondary: #b3b3b3;
+            --text-tertiary: #8a8a8a;
+            --border: #2d2d2d;
+            --code-bg: #2a2a2a;
+            --accent: #ffffff;
+            --tab-active: #03998a;
+            --tab-bg: #2a2a2a;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background-color: var(--bg);
+            font-size: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .container {
+            max-width: 750px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .header {
+            margin-bottom: 40px;
+            text-align: left;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            background: black;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 14px;
+            transition: all 0.2s ease;
+            z-index: 1000;
+        }
+
+        .theme-toggle:hover {
+            color: var(--text-primary);
+            border-color: var(--text-secondary);
+        }
+
+        h1 {
+            font-size: 40px;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: var(--text-secondary);
+            font-style: italic;
+            margin-bottom: 8px;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid var(--border);
+            margin: 40px 0 20px 0;
+            overflow-x: auto;
+        }
+
+        .tab-button {
+            background: none;
+            border: none;
+            padding: 12px 24px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .tab-button:hover {
+            color: var(--text-primary);
+            background: var(--tab-bg);
+        }
+
+        .tab-button.active {
+            color: var(--tab-active);
+            border-bottom-color: var(--tab-active);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin: 40px 0;
+        }
+
+        h2 {
+            font-size: 28px;
+            font-weight: 600;
+            margin: 48px 0 20px 0;
+            color: var(--text-primary);
+        }
+
+        h3 {
+            font-size: 22px;
+            font-weight: 600;
+            margin: 36px 0 16px 0;
+            color: var(--text-primary);
+        }
+
+        h4 {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 24px 0 12px 0;
+            color: var(--text-primary);
+        }
+
+        p {
+            margin-bottom: 20px;
+            color: var(--text-primary);
+        }
+
+        .image-placeholder {
+            background: var(--code-bg);
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            margin: 32px 0;
+            color: var(--text-tertiary);
+            font-style: italic;
+        }
+        .image-placeholder img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        ul, ol {
+            margin: 20px 0;
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        strong {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        code {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            font-size: 14px;
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--accent);
+        }
+
+        pre {
+            background: var(--code-bg);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 24px 0;
+            overflow-x: auto;
+            border: 1px solid var(--border);
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        blockquote {
+            border-left: 3px solid var(--border);
+            padding-left: 20px;
+            margin: 24px 0;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .section {
+            margin-bottom: 48px;
+        }
+
+        .footer {
+            margin-top: 80px;
+            padding-top: 40px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-tertiary);
+            font-style: italic;
+        }
+
+        .highlight-box {
+            background: var(--tab-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 24px 0;
+            border-left: 4px solid var(--tab-active);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px 16px;
+            }
+
+            h1 {
+                font-size: 32px;
+            }
+
+            h2 {
+                font-size: 24px;
+            }
+
+            h3 {
+                font-size: 20px;
+            }
+
+            .theme-toggle {
+                top: 20px;
+                right: 20px;
+            }
+
+            .tab-button {
+                padding: 12px 16px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    
+    <button class="theme-toggle" onclick="toggleTheme()">Dark</button>
+    
+    <div class="container" style="margin-top: 50px;">
+        <div class="header">
+            <h1>Building a Local AI Chat Application and Integration with Siri</h1>
+            <p class="subtitle">A complete guide to creating a privacy-focused AI chat interface, and getting your Siri a new personality</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="showTab('web-app')">Web Application</button>
+            <button class="tab-button" onclick="showTab('siri-integration')">Siri Integration</button>
+        </div>
+
+        <div id="web-app" class="tab-content active">
+            <div class="section">
+                <h2>Project Overview</h2>
+                <p>This project is a full-stack web application that creates a ChatGPT-like interface for interacting with locally-hosted AI models. Built using vanilla JavaScript, Node.js, and MongoDB, the application demonstrates how to integrate streaming AI responses, user authentication, and persistent chat history into a modern web interface.</p>
+                
+                <p>The system runs entirely on a local network, allowing multiple users to have private conversations with an AI assistant through their web browsers. Users can create accounts, maintain separate conversation histories, and enjoy real-time streaming responses - all while keeping their data completely local.</p>
+
+                <div class="image-placeholder">
+                    <!-- <strong>[IMAGE PLACEHOLDER]</strong><br>
+                    Screenshot of the main chat interface showing a conversation in progress with the clean, modern design -->
+                    <img src="images/1.png" alt="">
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Technical Implementation</h2>
+                
+                <h3>Frontend Architecture</h3>
+                <p>The frontend is built with vanilla JavaScript, HTML5, and CSS3, creating a responsive single-page application. The interface features:</p>
+                
+                <ul>
+                    <li><strong>Authentication System</strong>: Login and registration forms with client-side validation</li>
+                    <li><strong>Real-time Chat Interface</strong>: Message streaming with markdown rendering</li>
+                    <li><strong>Responsive Design</strong>: Mobile-first approach that works across all device sizes</li>
+                    <li><strong>Theme Support</strong>: Dark and light mode toggle</li>
+                    <li><strong>Chat History Sidebar</strong>: Easy navigation between different conversations</li>
+                </ul>
+
+                <div class="image-placeholder">
+                    <!-- <strong>[IMAGE PLACEHOLDER]</strong><br>
+                    Side-by-side comparison showing the app running on desktop and mobile devices -->
+                    <img src="images/2.png" alt="">
+                </div>
+
+                <p>The JavaScript architecture separates concerns cleanly:</p>
+                <pre><code>// Authentication handling
+document.getElementById('loginForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('loginUsername').value;
+    const password = document.getElementById('loginPassword').value;
+    // Handle login logic...
+};
+
+// Real-time streaming implementation
+const reader = res.body.getReader();
+const decoder = new TextDecoder();
+while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    // Process streaming response...
+}</code></pre>
+
+                <h3>Backend Development</h3>
+                <p>The backend is built with Node.js and Express, providing a RESTful API that handles:</p>
+                
+                <h4>User Authentication</h4>
+                <ul>
+                    <li>Secure password hashing with bcrypt</li>
+                    <li>Session management</li>
+                    <li>Input validation</li>
+                </ul>
+
+                <h4>Chat Management</h4>
+                <ul>
+                    <li>Creating and retrieving conversations</li>
+                    <li>Storing message history</li>
+                    <li>Real-time message persistence</li>
+                </ul>
+
+                <h4>Network Configuration</h4>
+                <ul>
+                    <li>Dynamic IP detection for local network access</li>
+                    <li>CORS configuration for cross-origin requests</li>
+                    <li>Multi-interface binding</li>
+                </ul>
+
+                <pre><code>// Dynamic IP detection for network accessibility
+function getLocalIPAddress() {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+        for (const interface of interfaces[name]) {
+            if (interface.family === 'IPv4' && !interface.internal) {
+                return interface.address;
+            }
+        }
+    }
+    return 'localhost';
+}</code></pre>
+
+                <div class="image-placeholder">
+                    <!-- <strong>[IMAGE PLACEHOLDER]</strong><br>
+                    Terminal screenshot showing the server starting up with IP addresses and connection status -->
+                    <img src="images/3.png" alt="">
+                </div>
+
+                <h3>Database Design</h3>
+                <p>MongoDB is used to store user accounts and chat histories. The schema design is optimized for chat applications:</p>
+
+                <pre><code>const chatSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    title: { type: String, default: 'New Chat' },
+    messages: [{
+        content: String,
+        isUser: Boolean,
+        timestamp: { type: Date, default: Date.now }
+    }]
+}, { timestamps: true });</code></pre>
+
+                <h3>AI Integration</h3>
+                <p>The application integrates with Ollama to run Llama 3.1 locally. The streaming implementation provides real-time responses:</p>
+
+                <pre><code>const res = await fetch(`${OLLAMA_BASE}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+        model: 'llama3.1', 
+        prompt: userMessage, 
+        stream: true 
+    })
+});</code></pre>
+
+                <div class="image-placeholder">
+                    <!-- <strong>[IMAGE PLACEHOLDER]</strong><br>
+                    Screenshot showing the AI response being typed out in real-time -->
+                    <img src="images/5.png" alt="">
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Setup and Deployment</h2>
+                <p>The application consists of four main components that need to be configured:</p>
+
+                <h3>1. Ollama (AI Model Server)</h3>
+                <pre><code>OLLAMA_HOST=0.0.0.0:11434 OLLAMA_ORIGINS="*" ollama serve</code></pre>
+
+                <h3>2. MongoDB (Database)</h3>
+                <pre><code>mongod --dbpath /path/to/mongodb --bind_ip 0.0.0.0</code></pre>
+
+                <h3>3. Backend Server</h3>
+                <pre><code>node backend.js</code></pre>
+
+                <h3>4. Frontend Server</h3>
+                <pre><code>http-server . -p 8000 -a 0.0.0.0</code></pre>
+
+            </div>
+
+            <div class="section">
+                <h2>Technical Challenges Solved</h2>
+                
+                <h3>Streaming Response Implementation</h3>
+                <p>One of the main challenges was implementing smooth real-time streaming of AI responses. The solution involved using the Fetch API's ReadableStream to process chunked responses and update the UI incrementally.</p>
+
+                <h3>Cross-Device Accessibility</h3>
+                <p>Making the application accessible across different devices on the same network required configuring all services to bind to network interfaces rather than just localhost, along with implementing dynamic IP detection.</p>
+
+                <h3>Responsive Chat Interface</h3>
+                <p>Creating a chat interface that works well on both desktop and mobile required careful CSS architecture using flexbox and grid layouts, along with responsive typography and spacing.</p>
+
+                <div class="image-placeholder">
+                    <!-- <strong>[IMAGE PLACEHOLDER]</strong><br>
+                    Code editor screenshot showing the clean, organized code structure -->
+                    <img src="images/4.png" alt="">
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Why Build This?</h2>
+                <p>This project addresses growing concerns about data privacy in AI interactions. By running everything locally, families can give children and elderly relatives access to AI assistance without worrying about sensitive conversations being stored on external servers. Whether it's homework help, health questions, or personal conversations, everything stays within the home network.</p>
+            </div>
+
+            <div class="section">
+                <h2>What I Learned</h2>
+                <p>Building this application provided hands-on experience with:</p>
+                <ul>
+                    <li>Full-stack JavaScript development</li>
+                    <li>Real-time data streaming</li>
+                    <li>User authentication and session management</li>
+                    <li>Database design and optimization</li>
+                    <li>Network configuration and cross-device compatibility</li>
+                    <li>AI model integration and prompt engineering</li>
+                    <li>Responsive web design principles</li>
+                </ul>
+
+                <p>The project demonstrates how modern web technologies can be combined to create sophisticated applications that prioritize user privacy while maintaining excellent user experience.</p>
+
+                <div class="image-placeholder">
+                    <!-- <strong>[IMAGE PLACEHOLDER]</strong><br>
+                    Final screenshot showing the complete application with multiple chat histories and a clean, professional interface -->
+                    <img src="images/end.png" alt="">
+                </div>
+            </div>
+        </div>
+
+        <div id="siri-integration" class="tab-content">
+            <div class="section">
+                <h2>Integrating AI into Siri</h2>
+                <p>Building on the local AI server setup, I extended the project by integrating the Llama model directly into Siri using Apple Shortcuts. This creates a completely voice-driven AI assistant that leverages the same local infrastructure while providing hands-free interaction.</p>
+
+                <div class="highlight-box">
+                    <strong>Key Innovation:</strong> Transform your local AI into a voice assistant that works across all Apple devices while maintaining complete privacy - no data leaves your network.
+                </div>
+
+                <div class="image-placeholder">
+                    <img src="images/s1.PNG"  alt="">
+                </div>
+
+                <div class="image-placeholder">
+                    <video controls style="max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+                        <source src="images/siri-demo.mp4" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>How It Works</h2>
+                <p>The integration uses Apple's Shortcuts app to create a seamless voice interface that bridges Siri with your local AI server:</p>
+
+                <ol>
+                    <li><strong>Voice Input</strong>: Siri captures and transcribes your spoken question using Apple's speech recognition</li>
+                    <li><strong>Text Processing</strong>: The transcribed text is formatted and prepared for the API request</li>
+                    <li><strong>API Request</strong>: The shortcut sends the text to your local Ollama API endpoint using "Get Contents of URL"</li>
+                    <li><strong>Response Processing</strong>: The AI response is received and parsed from the JSON response</li>
+                    <li><strong>Voice Output</strong>: Siri speaks the AI's response back to you using text-to-speech</li>
+                </ol>
+            </div>
+
+            <div class="section">
+                <h2>Technical Implementation</h2>
+
+                <h3>Shortcut Configuration</h3>
+                <p>The Apple Shortcut uses the "Get Contents of URL" action to communicate with your local Ollama server:</p>
+
+                <pre><code>// Shortcut API Configuration
+URL: http://[YOUR_MAC_IP]:11434/api/generate
+Method: POST
+Headers: Content-Type: application/json
+
+Request Body:
+{
+    "model": "llama3.1",
+    "prompt": "[Siri Input Text]",
+    "stream": false,
+    "options": {
+        "temperature": 0.7,
+        "max_tokens": 500
+    }
+}</code></pre>
+
+                <h3>Response Handling</h3>
+                <p>The shortcut processes the JSON response and extracts the AI's answer:</p>
+
+                <pre><code>// Response Processing in Shortcuts
+1. Get Contents of URL (API call)
+2. Get Value from Dictionary (key: "response")
+3. Speak Text (output the AI response)</code></pre>
+
+                <div class="image-placeholder">
+                    <img src="images/s3.png" alt="">
+                </div>
+
+                <h3>Network Requirements</h3>
+                <p>Ensure your Ollama server is accessible across devices on your network:</p>
+
+                <pre><code># Start Ollama with network access
+OLLAMA_HOST=0.0.0.0:11434 OLLAMA_ORIGINS="*" ollama serve
+
+# Verify accessibility from other devices
+curl http://[YOUR_MAC_IP]:11434/api/tags</code></pre>
+            </div>
+
+            <div class="section">
+                <h2>Setup Guide</h2>
+
+                <h3>Prerequisites</h3>
+                <ul>
+                    <li>Ollama running on your Mac with network access enabled</li>
+                    <li>Llama 3.1 (or your preferred model) downloaded and ready</li>
+                    <li>Apple device with Shortcuts app installed</li>
+                    <li>Both devices connected to the same network</li>
+                </ul>
+
+                <h3>Step-by-Step Setup</h3>
+                <ol>
+                    <li><strong>Configure Ollama for Network Access</strong>
+                        <pre><code>OLLAMA_HOST=0.0.0.0:11434 OLLAMA_ORIGINS="*" ollama serve</code></pre>
+                    </li>
+                    <li><strong>Find Your Mac's IP Address</strong>
+                        <pre><code>ifconfig | grep "inet " | grep -v 127.0.0.1</code></pre>
+                    </li>
+                    <li><strong>Create New Shortcut</strong>
+                        <ul>
+                            <li>Open Apple Shortcuts app</li>
+                            <li>Tap "+" to create new shortcut</li>
+                            <li>Name it "Ask AI" or similar</li>
+                        </ul>
+                    </li>
+                    <li><strong>Add Actions to Shortcut</strong>
+                        <ul>
+                            <li>Add "Ask for Input" (Speech input)</li>
+                            <li>Add "Get Contents of URL"</li>
+                            <li>Configure URL and request body</li>
+                            <li>Add "Get Value from Dictionary"</li>
+                            <li>Add "Speak Text"</li>
+                        </ul>
+                    </li>
+                    <li><strong>Configure Siri Phrase</strong>
+                        <ul>
+                            <li>In shortcut settings, add to Siri</li>
+                            <li>Set trigger phrase: "Ask AI"</li>
+                        </ul>
+                    </li>
+                </ol>
+
+            </div>
+
+            <div class="section">
+                <h2>Benefits and Features</h2>
+
+                <h3>Privacy and Security</h3>
+                <ul>
+                    <li><strong>Completely Local</strong>: No data leaves your network</li>
+                    <li><strong>No Cloud Dependencies</strong>: Works without internet connection</li>
+                    <li><strong>Family-Safe</strong>: Children can use AI assistance safely</li>
+                    <li><strong>No Subscriptions</strong>: One-time setup, no recurring costs</li>
+                </ul>
+
+                <h3>Multi-Device Access</h3>
+                <ul>
+                    <li><strong>iPhone/iPad</strong>: Works through Siri on all iOS devices</li>
+                    <li><strong>Apple Watch</strong>: Voice queries directly from your wrist</li>
+                    <li><strong>Mac</strong>: Siri integration on macOS</li>
+                    <li><strong>HomePod</strong>: Hands-free AI throughout your home</li>
+                    <li><strong>CarPlay</strong>: Safe AI assistance while driving</li>
+                </ul>
+
+                <h3>Natural Interaction</h3>
+                <ul>
+                    <li><strong>Conversational</strong>: Feels like talking to a knowledgeable friend</li>
+                    <li><strong>Hands-Free</strong>: Perfect for cooking, exercising, or driving</li>
+                    <li><strong>Fast Response</strong>: Local processing means quick answers</li>
+                </ul>
+
+            </div>
+
+            
+
+            <div class="section">
+                <h2>Advanced Customization</h2>
+
+                <h3>Multiple AI Personalities</h3>
+                <p>Create different shortcuts for specialized AI assistants:</p>
+
+                <ul>
+                    <li><strong>"Ask Teacher"</strong>: Educational queries with simple explanations</li>
+                    <li><strong>"Ask Coder"</strong>: Programming help and debugging</li>
+                    <li><strong>"Ask Chef"</strong>: Cooking tips and recipe suggestions</li>
+                    <li><strong>"Ask Writer"</strong>: Creative writing and storytelling</li>
+                </ul>
+
+                <h3>Custom Prompting</h3>
+                <p>Modify the API request to include system prompts:</p>
+
+                <pre><code>{
+    "model": "llama3.1",
+    "prompt": "You are a helpful cooking assistant. User question: [Siri Input]",
+    "stream": false,
+    "system": "Always provide practical, safe cooking advice."
+}</code></pre>
+
+
+            </div>
+
+            <div class="section">
+                <h2>Troubleshooting</h2>
+
+                <h3>Common Issues</h3>
+
+                <h4>Connection Problems</h4>
+                <ul>
+                    <li>Verify Ollama is running with network access</li>
+                    <li>Check firewall settings on your Mac</li>
+                    <li>Ensure devices are on the same network</li>
+                    <li>Test API endpoint with curl or browser</li>
+                </ul>
+
+                <h4>Shortcut Not Responding</h4>
+                <ul>
+                    <li>Check URL format and IP address</li>
+                    <li>Verify JSON request structure</li>
+                    <li>Test with a simple request first</li>
+                    <li>Enable shortcut debugging mode</li>
+                </ul>
+
+                <h4>Poor Voice Recognition</h4>
+                <ul>
+                    <li>Speak clearly and at moderate pace</li>
+                    <li>Use consistent trigger phrases</li>
+                    <li>Train Siri with your voice in Settings</li>
+                    <li>Minimize background noise</li>
+                </ul>
+
+                <div class="highlight-box">
+                    <strong>Pro Tip:</strong> Create a simple test shortcut first that just returns a static response to verify your setup before building the full AI integration.
+                </div>
+            </div>
+
+            
+        </div>
+
+        <div class="footer">
+            <p>This project showcases the implementation of a complete AI ecosystem from concept to deployment, integrating multiple technologies and platforms to solve real-world privacy concerns while maintaining modern user experience expectations across web and voice interfaces.</p>
+            <p>&copy; 2025 Dhadge Vedant. All rights reserved.</p>
+        </div>
+    </div>
+
+    <script>
+        function toggleTheme() {
+            const currentTheme = document.body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.body.setAttribute('data-theme', newTheme);
+            
+            const toggle = document.querySelector('.theme-toggle');
+            toggle.textContent = newTheme === 'dark' ? 'Light' : 'Dark';
+        }
+
+
+        // Set initial theme based on system preference
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.body.setAttribute('data-theme', 'dark');
+            document.querySelector('.theme-toggle').textContent = 'Light';
+        }
+        function showTab(tabId) {
+            const tabs = document.querySelectorAll('.tab-content');
+            const buttons = document.querySelectorAll('.tab-button');
+
+            tabs.forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            buttons.forEach(button => {
+                button.classList.remove('active');
+            });
+
+            document.getElementById(tabId).classList.add('active');
+            document.querySelector(`.tab-button[onclick="showTab('${tabId}')"]`).classList.add('active');
+        }
+    </script>
+</body>
+</html>
